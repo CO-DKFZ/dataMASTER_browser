@@ -13,7 +13,7 @@ nr = elementNROWS(DB[[experiment_id]]@assays)
 
 COMPONENT[[experiment_id]]$ui = div(
 	id = qq("@{experiment_id}_workspace"),
-	h3("SNV germline"),
+	h3(qq("Experiment: @{experiment_name}")),
 	div(
 		column(7,
 			selectInput(qq("@{experiment_id}_config_function_type"), label = "Function type", 
@@ -68,8 +68,10 @@ COMPONENT[[experiment_id]]$server = local({
 	
 	function(input, output, session) {
 
-	df = as.data.frame(DB[[experiment_id]])
-	CD = colData(DB[, , experiment_id])
+	obj = EXPERIMENTS[[experiment_id]]
+	df = as.data.frame(obj)
+	
+	CD = CD_LIST[[experiment_id]]
 
 	observeEvent(input[[qq("@{experiment_id}_config_function_type")]], {
 
@@ -181,7 +183,7 @@ COMPONENT[[experiment_id]]$server = local({
 	})
 
 	observeEvent(input[[qq("@{experiment_id}_config_sample_list")]], {
-		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]])
+		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]], experiment_id)
 
 		output[[qq("@{experiment_id}_config_nsample_selected")]] = renderText({
 			paste0(length(samples), " samples selected")
@@ -197,7 +199,7 @@ COMPONENT[[experiment_id]]$server = local({
 			function_type = input[[qq("@{experiment_id}_config_function_type")]]
 		}
 
-		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]])
+		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]], experiment_id)
 		df = df[df$Function %in% function_type, , drop = FALSE]
 
 		output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
@@ -264,7 +266,7 @@ COMPONENT[[experiment_id]]$server = local({
             plot(log2(fc), type = "h", ylab = TeX("log2(fold enrichment): log2 ( \\frac{(n_snv/n_all_snv}{(chr_len/genome_len)} )"), axes = FALSE)			
             axis(side = 1, at = seq_along(fc), labels = names(fc))
 			axis(side = 2)
-			box()
+			graphics::box()
 		})
 
 		output[[qq("@{experiment_id}_summary_genomic_locations")]] = renderPlot({

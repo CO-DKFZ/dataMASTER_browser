@@ -2,4 +2,7 @@ dataMASTER.RData
 dataMASTER_browser_2022_11_22.zip
 220719.dataMASTER_usageGuide.Rmd
 220719.dataMASTER_usageGuide.html
+.DS_Store
+*.rds
+*.RData
 

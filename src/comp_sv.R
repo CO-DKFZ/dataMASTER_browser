@@ -1,10 +1,15 @@
-COMPONENT$snv = list()
 
-experiment_id = "snv"
-experiment_name = "SNV"
 
-snv_function_type = c("synonymous", "nonsynonymous", "stopgain", "stoploss", "unknown")
-names(snv_function_type) = snv_function_type
+experiment_id = "sv"
+experiment_name = "SV"
+
+COMPONENT[[experiment_id]] = list()
+
+df = as.data.frame(DB[[experiment_id]])
+
+sv_type = unique(as.vector(df$Type))
+sv_type = sv_type[!is.na(sv_type)]
+names(sv_type) = sv_type
 
 
 nr = elementNROWS(DB[[experiment_id]]@assays)
@@ -14,8 +19,8 @@ COMPONENT[[experiment_id]]$ui = div(
 	h3(qq("Experiment: @{experiment_name}")),
 	div(
 		column(7,
-			selectInput(qq("@{experiment_id}_config_function_type"), label = "Function type", 
-				choices = snv_function_type, selected = c("nonsynonymous", "stopgain", "stoploss"), 
+			selectInput(qq("@{experiment_id}_config_function_type"), label = "Type", 
+				choices = sv_type, selected = sv_type, 
 				multiple = TRUE, width = 600),
 			tags$hr(),
 			uiOutput(qq("@{experiment_id}_sample_filter_output")),
@@ -40,10 +45,6 @@ COMPONENT[[experiment_id]]$ui = div(
 		),
 		tabPanel("Genome-wide distribution",
 			uiOutput(qq("@{experiment_id}_genome_wide_ui")),
-			style = "padding:16px 0px"
-		),
-		tabPanel("Top most mutated genes",
-			uiOutput(qq("@{experiment_id}_top_genes_ui")),
 			style = "padding:16px 0px"
 		),
 		tabPanel("Top most mutated samples",
@@ -72,13 +73,13 @@ COMPONENT[[experiment_id]]$server = local({
 	observeEvent(input[[qq("@{experiment_id}_config_function_type")]], {
 
 		if(length(input[[qq("@{experiment_id}_config_function_type")]]) == 0) {
-			updateSelectInput(session, qq("@{experiment_id}_config_function_type"), selected = "nonsynonymous")
-			function_type = "nonsynonymous"
+			updateSelectInput(session, qq("@{experiment_id}_config_function_type"), selected = c("INV", "DEL", "TRA", "DUP"))
+			function_type = c("INV", "DEL", "TRA", "DUP")
 		} else {
 			function_type = input[[qq("@{experiment_id}_config_function_type")]]
 		}
 
-		df = df[df$Function %in% function_type, , drop = FALSE]
+		df = df[df$Type %in% function_type, , drop = FALSE]
 		l = rownames(CD) %in% unique(df$group_name)
 		
 		updateTextAreaInput(session, qq("@{experiment_id}_config_sample_list"),
@@ -151,7 +152,7 @@ COMPONENT[[experiment_id]]$server = local({
 			function_type = input[[qq("@{experiment_id}_config_function_type")]]
 		}
 
-		df = df[df$Function %in% function_type, , drop = FALSE]
+		df = df[df$Type %in% function_type, , drop = FALSE]
 		l = rownames(CD) %in% unique(df$group_name)
 		
 		for(nm in CD_SELECTED) {
@@ -196,15 +197,13 @@ COMPONENT[[experiment_id]]$server = local({
 		}
 
 		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]], experiment_id)
-		df = df[df$Function %in% function_type, , drop = FALSE]
+		df = df[df$Type %in% function_type, , drop = FALSE]
+		df$TargetChrom = gsub("[^0-9]", "", df$TargetChrom)
 
 		output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
 			div(
 				box(title = qq("Number of @{experiment_name}s per sample"),
 					plotOutput(qq("@{experiment_id}_summary_n_snv"))
-				),
-				box(title = "Number of mutated genes per sample",
-					plotOutput(qq("@{experiment_id}_summary_n_gene"))
 				),
 				box(title = qq("Number of @{experiment_name}s per chromosome"),
 					plotOutput(qq("@{experiment_id}_summary_n_snv_by_chr")),
@@ -215,6 +214,12 @@ COMPONENT[[experiment_id]]$server = local({
 				),
 				box(title = "Function",
 					plotOutput(qq("@{experiment_id}_summary_function"))
+				),
+				box(title = "Intra/Inter chromosome SVs",
+					plotOutput(qq("@{experiment_id}_summary_inter_intra"))
+				),
+				box(title = "Inter chromosome events",
+					plotOutput(qq("@{experiment_id}_summary_inter_chord_diagram"))
 				),
 				div(style="clear:both;")
 			)
@@ -232,24 +237,11 @@ COMPONENT[[experiment_id]]$server = local({
 			legend("topleft", pch = 16, legend = c("All samples", "Selected samples"), col = c("black", "red"), border = NA)
 		})
 
-		output[[qq("@{experiment_id}_summary_n_gene")]] = renderPlot({
-			showNotification(qq("make overview plot for @{experiment_id}."), duration = 4, type = "message")
-			
-			n = tapply(df$Gene, df$group_name, function(x) length(unique(x)))
-			n = sort(n)
-			par(mar = c(4, 4, 1, 1))
-			plot(n, pch = 16, cex = 0.5, log = "y", ylab = "# mutated genes (in log10 scale)", xlab = "Ordered samples")
-			
-			ind = names(n) %in% samples
-			points(which(ind), n[ind], pch = 16, cex = 1, col = "red")
-			legend("topleft", pch = 16, legend = c("All samples", "Selected samples"), col = c("black", "red"), border = NA)
-		})
-
 		output[[qq("@{experiment_id}_summary_n_snv_by_chr")]] = renderPlot({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 
 			par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
-			x = table(df$seqnames)
+			x = table(as.vector(df$seqnames))
 			barplot(x, ylab = qq("# @{experiment_name}s"))
 
 			chr_len = getChromInfoFromUCSC(GENOME)
@@ -259,7 +251,7 @@ COMPONENT[[experiment_id]]$server = local({
 			fc = (x/sum(x)) / (chr_len/sum(chr_len))
 			fc = structure(as.vector(fc), names = names(fc))
 			par(mar = c(4, 6, 1, 1))
-            plot(log2(fc), type = "h", ylab = TeX("log2(fold enrichment): log2 ( \\frac{(n_snv/n_all_snv}{(chr_len/genome_len)} )"), axes = FALSE)			
+            plot(log2(fc), type = "h", ylab = TeX("log2(fold enrichment): log2 ( \\frac{(n_sv/n_all_sv}{(chr_len/genome_len)} )"), axes = FALSE)			
             axis(side = 1, at = seq_along(fc), labels = names(fc))
 			axis(side = 2)
 			graphics::box()
@@ -268,13 +260,31 @@ COMPONENT[[experiment_id]]$server = local({
 		output[[qq("@{experiment_id}_summary_genomic_locations")]] = renderPlot({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			par(mar = c(4, 4, 1, 1))
-			pie(table(df$Location))
+			pie(table(df$Direction))
 		})
 
 		output[[qq("@{experiment_id}_summary_function")]] = renderPlot({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			par(mar = c(4, 4, 1, 1))
-			pie(table(df$Function))
+			pie(table(df$Type))
+		})
+
+		output[[qq("@{experiment_id}_summary_inter_intra")]] = renderPlot({
+			df = df[df$group_name %in% samples, , drop = FALSE]
+			par(mar = c(4, 4, 1, 1))
+			pie(table(ifelse(df$seqnames == df$TargetChrom, "Intra chromosome", "Inter chromosome")))
+		})
+
+		output[[qq("@{experiment_id}_summary_inter_chord_diagram")]] = renderPlot({
+			tt = table(df$seqnames, df$TargetChrom)
+			tt = tt[intersect(rownames(tt), CHROMOSOME), intersect(colnames(tt), CHROMOSOME), drop = FALSE]
+			cn = union(rownames(tt), colnames(tt))
+			tt2 = matrix(0, nrow = length(cn), ncol = length(cn))
+			rownames(tt2) = colnames(tt2) = cn
+			tt2[rownames(tt), colnames(tt)] = tt
+			diag(tt2) = 0
+			chordDiagram(tt2)
+			circos.clear()
 		})
 
 		output[[qq("@{experiment_id}_genome_wide_ui")]] = renderUI({
@@ -296,60 +306,6 @@ COMPONENT[[experiment_id]]$server = local({
 			make_rainfall(GRanges(seqnames = df$seqnames, ranges = IRanges(df$start, df$end)), layout = input[[qq("@{experiment_id}_genome_wide_radio")]])
 		})
 
-		output[[qq("@{experiment_id}_top_genes_ui")]] = renderUI({
-			div(
-				selectInput(qq("@{experiment_id}_top_genes_n_top"), label = "Number of top genes", choices = c("10" = 10, "20" = 20, "50" = 50, "100" = 100), selected = 20),
-				box(title = "Top genes",
-					tableOutput(qq("@{experiment_id}_top_genes")),
-					width = 3
-				),
-				box(title = qq("OncoPrint of the top genes (in @{length(samples)} samples)"),
-					plotOutput(qq("@{experiment_id}_top_genes_oncoprint")),
-					width = 8
-				),
-				tags$script(HTML(qq('
-	$("#@{experiment_id}_top_genes_n_top").change(function() {
-		var n = parseInt($(this).val());
-		$("#@{experiment_id}_top_genes_oncoprint").height(n*20);
-	});'))),
-				div(style = "clear:both;")
-			)
-		})
-
-		observeEvent(input[[qq("@{experiment_id}_top_genes_n_top")]], {
-		
-			df = df[df$group_name %in% samples, , drop = FALSE]
-			tb = df[, c("group_name", "Gene")]
-			xn = tapply(tb$group_name, tb$Gene, length) # number of SNVs per gene
-			tb = unique(tb)
-
-			x = tapply(tb$group_name, tb$Gene, length) # number of samples per gene
-			p = x/length(samples)
-
-			k = as.numeric(input[[qq("@{experiment_id}_top_genes_n_top")]])
-			ind = order(p, xn[names(p)], decreasing = TRUE)[1:min(length(p), k)]
-
-			output[[qq("@{experiment_id}_top_genes")]] = renderTable({
-				dt = data.frame(Gene = names(p)[ind], Fraction = paste0(round(p[ind]*100, 1), "%"), "#Samples" = x[ind], check.names = FALSE)
-				dt[, 1] = qq("<a href=\"#\" onclick=\"link_to_other_tab($(this), 'gene', {gene_search:'@{dt[,1]}'}, 'gene_search_submit');false\">@{dt[,1]}</a>", collapse = FALSE)
-				dt
-			}, sanitize.text.function = function(x) x)
-
-			tb = tb[tb$Gene %in% names(p)[ind], , drop = FALSE]
-			mm = xtabs(~ Gene + group_name, tb)
-
-			# if(ncol(mm) > 1000) {
-			# 	mm = mm[, sample(ncol(mm), 1000), drop = FALSE]
-			# }
-			output[[qq("@{experiment_id}_top_genes_oncoprint")]] = renderPlot({
-				ht = oncoPrint(list(snv = mm), name = experiment_name,
-					alter_fun = list(snv = alter_graphic("rect", width = 1, height = 0.9, fill = "red")),
-					show_column_names = FALSE)
-				draw(ht)
-			})
-		})
-
-		
 
 		output[[qq("@{experiment_id}_top_samples_ui")]] = renderUI({
 			div(
@@ -358,49 +314,22 @@ COMPONENT[[experiment_id]]$server = local({
 					tableOutput(qq("@{experiment_id}_top_samples")),
 					width = 4
 				),
-				box(title = qq("OncoPrint (samples are on rows, genes are on columns)"),
-					plotOutput(qq("@{experiment_id}_top_samples_oncoprint")),
-					width = 8
-				),
-				tags$script(HTML(qq('
-	$("#@{experiment_id}_top_samples_n_top").change(function() {
-		var n = parseInt($(this).val());
-		$("#@{experiment_id}_top_samples_oncoprint").height(n*20);
-	});'))),
 				div(style = "clear:both;")
 			)
 		})
 
-		
 		observeEvent(input[[qq("@{experiment_id}_top_samples_n_top")]], {
 			df = df[df$group_name %in% samples, , drop = FALSE]
-			tb = df[, c("group_name", "Gene")]
+			tb = df[, c("group_name"), drop = FALSE]
 			xn = tapply(tb$group_name, tb$group_name, length) # number of SNVs per sample
-			
-			tb = unique(tb)
-			x = tapply(tb$Gene, tb$group_name, length) # number of genes per sample
-			
+						
 			k = input[[qq("@{experiment_id}_top_samples_n_top")]]
-			ind = order(xn, x, decreasing = TRUE)[1:min(length(xn), k)]
+			ind = order(xn, decreasing = TRUE)[1:min(length(xn), k)]
 			
 			output[[qq("@{experiment_id}_top_samples")]] = renderTable({
-				dt = data.frame(Sample = names(x)[ind], "#SNVs" = xn[ind], "#Mutated genes" = x[ind], check.names = FALSE)
-				# dt[, 1] = qq("<a href=\"#\" onclick=\"link_to_other_tab($(this), 'gene', {gene_search:'@{dt[,1]}'}, 'gene_search_submit');false\">@{dt[,1]}</a>", collapse = FALSE)
+				dt = data.frame(Sample = names(xn)[ind], "#SVs" = xn[ind], check.names = FALSE)
 				dt
 			}, sanitize.text.function = function(x) x)
-
-			tb = tb[tb$group_name %in% names(x)[ind], , drop = FALSE]
-			mm = xtabs(~ group_name + Gene, tb)
-
-			# if(ncol(mm) > 1000) {
-			# 	mm = mm[, sample(ncol(mm), 1000), drop = FALSE]
-			# }
-			output[[qq("@{experiment_id}_top_samples_oncoprint")]] = renderPlot({
-				ht = oncoPrint(list(snv = mm), name = experiment_name,
-					alter_fun = list(snv = alter_graphic("rect", width = 1, height = 0.9, fill = "red")),
-					show_column_names = FALSE)
-				draw(ht)
-			})
 		})
 
 
@@ -423,8 +352,6 @@ COMPONENT[[experiment_id]]$server = local({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			df = df[, -1]
 			colnames(df)[1:2] = c("Sample", "Chr")
-			df[, "AF_T"] = round(df[, "AF_T"], 2)
-			df[, "AF_C"] = round(df[, "AF_C"], 2)
 			rownames(df) = NULL
 			df
 		}, server = TRUE, options = list(scrollX = TRUE))
@@ -433,8 +360,6 @@ COMPONENT[[experiment_id]]$server = local({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			df = df[, -1]
 			colnames(df)[1:2] = c("Sample", "Chr")
-			df[, "AF_T"] = round(df[, "AF_T"], 2)
-			df[, "AF_C"] = round(df[, "AF_C"], 2)
 			rownames(df) = NULL
 			df
 

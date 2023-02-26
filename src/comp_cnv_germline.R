@@ -1,10 +1,15 @@
-COMPONENT$snv = list()
 
-experiment_id = "snv"
-experiment_name = "SNV"
 
-snv_function_type = c("synonymous", "nonsynonymous", "stopgain", "stoploss", "unknown")
-names(snv_function_type) = snv_function_type
+experiment_id = "cnv_germline"
+experiment_name = "cnv_germline"
+
+COMPONENT[[experiment_id]] = list()
+
+df = as.data.frame(DB[[experiment_id]])
+
+cnv_type = unique(as.vector(df$Type))
+cnv_type = cnv_type[!is.na(cnv_type)]
+names(cnv_type) = cnv_type
 
 
 nr = elementNROWS(DB[[experiment_id]]@assays)
@@ -14,8 +19,8 @@ COMPONENT[[experiment_id]]$ui = div(
 	h3(qq("Experiment: @{experiment_name}")),
 	div(
 		column(7,
-			selectInput(qq("@{experiment_id}_config_function_type"), label = "Function type", 
-				choices = snv_function_type, selected = c("nonsynonymous", "stopgain", "stoploss"), 
+			selectInput(qq("@{experiment_id}_config_function_type"), label = "Type", 
+				choices = cnv_type, selected = cnv_type, 
 				multiple = TRUE, width = 600),
 			tags$hr(),
 			uiOutput(qq("@{experiment_id}_sample_filter_output")),
@@ -42,12 +47,8 @@ COMPONENT[[experiment_id]]$ui = div(
 			uiOutput(qq("@{experiment_id}_genome_wide_ui")),
 			style = "padding:16px 0px"
 		),
-		tabPanel("Top most mutated genes",
-			uiOutput(qq("@{experiment_id}_top_genes_ui")),
-			style = "padding:16px 0px"
-		),
-		tabPanel("Top most mutated samples",
-			uiOutput(qq("@{experiment_id}_top_samples_ui")),
+		tabPanel("CNV plot",
+			uiOutput(qq("@{experiment_id}_cnv_plot_ui")),
 			style = "padding:16px 0px"
 		),
 		tabPanel(qq("@{experiment_name} table"),
@@ -72,13 +73,13 @@ COMPONENT[[experiment_id]]$server = local({
 	observeEvent(input[[qq("@{experiment_id}_config_function_type")]], {
 
 		if(length(input[[qq("@{experiment_id}_config_function_type")]]) == 0) {
-			updateSelectInput(session, qq("@{experiment_id}_config_function_type"), selected = "nonsynonymous")
-			function_type = "nonsynonymous"
+			updateSelectInput(session, qq("@{experiment_id}_config_function_type"), selected = c("DUP", "DEL"))
+			function_type = c("DUP", "DEL")
 		} else {
 			function_type = input[[qq("@{experiment_id}_config_function_type")]]
 		}
 
-		df = df[df$Function %in% function_type, , drop = FALSE]
+		df = df[df$Type %in% function_type, , drop = FALSE]
 		l = rownames(CD) %in% unique(df$group_name)
 		
 		updateTextAreaInput(session, qq("@{experiment_id}_config_sample_list"),
@@ -151,7 +152,7 @@ COMPONENT[[experiment_id]]$server = local({
 			function_type = input[[qq("@{experiment_id}_config_function_type")]]
 		}
 
-		df = df[df$Function %in% function_type, , drop = FALSE]
+		df = df[df$Type %in% function_type, , drop = FALSE]
 		l = rownames(CD) %in% unique(df$group_name)
 		
 		for(nm in CD_SELECTED) {
@@ -196,25 +197,30 @@ COMPONENT[[experiment_id]]$server = local({
 		}
 
 		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]], experiment_id)
-		df = df[df$Function %in% function_type, , drop = FALSE]
+		df = df[df$Type %in% function_type, , drop = FALSE]
 
 		output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
 			div(
 				box(title = qq("Number of @{experiment_name}s per sample"),
 					plotOutput(qq("@{experiment_id}_summary_n_snv"))
 				),
-				box(title = "Number of mutated genes per sample",
-					plotOutput(qq("@{experiment_id}_summary_n_gene"))
+				box(title = qq("Width distribution of @{experiment_name}s"),
+					plotOutput(qq("@{experiment_id}_summary_width_dist"))
 				),
+				
 				box(title = qq("Number of @{experiment_name}s per chromosome"),
 					plotOutput(qq("@{experiment_id}_summary_n_snv_by_chr")),
 					width = 12
 				),
-				box(title = "Genomic locations",
-					plotOutput(qq("@{experiment_id}_summary_genomic_locations"))
+				box(title = "Confidence",
+					plotOutput(qq("@{experiment_id}_summary_Confidence"))
 				),
 				box(title = "Function",
 					plotOutput(qq("@{experiment_id}_summary_function"))
+				),
+				
+				box(title = "Distribution of CN",
+					plotOutput(qq("@{experiment_id}_summary_CN"))
 				),
 				div(style="clear:both;")
 			)
@@ -232,24 +238,17 @@ COMPONENT[[experiment_id]]$server = local({
 			legend("topleft", pch = 16, legend = c("All samples", "Selected samples"), col = c("black", "red"), border = NA)
 		})
 
-		output[[qq("@{experiment_id}_summary_n_gene")]] = renderPlot({
-			showNotification(qq("make overview plot for @{experiment_id}."), duration = 4, type = "message")
-			
-			n = tapply(df$Gene, df$group_name, function(x) length(unique(x)))
-			n = sort(n)
+		output[[qq("@{experiment_id}_summary_width_dist")]] = renderPlot({
+			df = df[df$group_name %in% samples, , drop = FALSE]
 			par(mar = c(4, 4, 1, 1))
-			plot(n, pch = 16, cex = 0.5, log = "y", ylab = "# mutated genes (in log10 scale)", xlab = "Ordered samples")
-			
-			ind = names(n) %in% samples
-			points(which(ind), n[ind], pch = 16, cex = 1, col = "red")
-			legend("topleft", pch = 16, legend = c("All samples", "Selected samples"), col = c("black", "red"), border = NA)
+			plot(density(log10(df$width)), xlab = "log10 width", ylab = "Density")
 		})
 
 		output[[qq("@{experiment_id}_summary_n_snv_by_chr")]] = renderPlot({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 
 			par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
-			x = table(df$seqnames)
+			x = table(as.vector(df$seqnames))
 			barplot(x, ylab = qq("# @{experiment_name}s"))
 
 			chr_len = getChromInfoFromUCSC(GENOME)
@@ -259,150 +258,156 @@ COMPONENT[[experiment_id]]$server = local({
 			fc = (x/sum(x)) / (chr_len/sum(chr_len))
 			fc = structure(as.vector(fc), names = names(fc))
 			par(mar = c(4, 6, 1, 1))
-            plot(log2(fc), type = "h", ylab = TeX("log2(fold enrichment): log2 ( \\frac{(n_snv/n_all_snv}{(chr_len/genome_len)} )"), axes = FALSE)			
+            plot(log2(fc), type = "h", ylab = TeX("log2(fold enrichment): log2 ( \\frac{(n_sv/n_all_sv}{(chr_len/genome_len)} )"), axes = FALSE)			
             axis(side = 1, at = seq_along(fc), labels = names(fc))
 			axis(side = 2)
 			graphics::box()
 		})
 
-		output[[qq("@{experiment_id}_summary_genomic_locations")]] = renderPlot({
+		output[[qq("@{experiment_id}_summary_Confidence")]] = renderPlot({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			par(mar = c(4, 4, 1, 1))
-			pie(table(df$Location))
+			pie(table(df$Confidence))
 		})
 
 		output[[qq("@{experiment_id}_summary_function")]] = renderPlot({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			par(mar = c(4, 4, 1, 1))
-			pie(table(df$Function))
+			pie(table(df$Type))
+		})
+
+		output[[qq("@{experiment_id}_summary_CN")]] = renderPlot({
+			df = df[df$group_name %in% samples, , drop = FALSE]
+			par(mar = c(4, 4, 1, 1))
+			plot(table(df$CN), xlab = "CN", ylab = "Count", main = "")
 		})
 
 		output[[qq("@{experiment_id}_genome_wide_ui")]] = renderUI({
 			div(
-				radioButtons(qq("@{experiment_id}_genome_wide_radio"), "Visualization layout", 
-					choices = c("Rectangular" = "rect", "Circular" = "circular"), selected = "rect",
-					inline = TRUE),
-				box(title = qq("Rainfall plot of all @{experiment_name}s in selected samples"),
-					plotOutput(qq("@{experiment_id}_rainfall"), height = 700),
-					width = 10
+				div(
+					column(9, selectInput(qq("@{experiment_id}_heatmap_chr"), label = "Select chromosomes", 
+						choices = structure(CHROMOSOME, names = CHROMOSOME), selected = CHROMOSOME, 
+						multiple = TRUE, width = "100%")),
+					column(3, actionButton(qq("@{experiment_id}_heatmap_chr_submit"), "Make heatmap", style="margin-top:24px")),
+					div(style = "clear:both;"),
+					style = "width:800px"
+				),
+				box(title = qq("Genomic heatmap of all @{experiment_name}s in selected samples"),
+					plotOutput(qq("@{experiment_id}_heatmap"), height = 800),
+					width = 12
 				),
 				div(style = "clear:both;")
 			)
 		})
 
-		output[[qq("@{experiment_id}_rainfall")]] = renderPlot({
-			showNotification(qq("make rainfall plot for @{experiment_id}."), duration = 4, type = "message")
+		output[[qq("@{experiment_id}_heatmap")]] = renderPlot({
+			showNotification(qq("make cnv heatmap plot for @{experiment_id}."), duration = 4, type = "message")
 			df = df[df$group_name %in% samples, , drop = FALSE]
-			make_rainfall(GRanges(seqnames = df$seqnames, ranges = IRanges(df$start, df$end)), layout = input[[qq("@{experiment_id}_genome_wide_radio")]])
+			m = CNV_GERMLINE_NORMALIZED$matrix
+			chr_window = CNV_GERMLINE_NORMALIZED$chr_window
+
+			all_chr = as.vector(seqnames(chr_window))
+			l_chr = all_chr %in% CHROMOSOME
+
+			m = m[samples, l_chr, drop = FALSE]
+
+			if(nrow(m) > 1000) {
+				m = m[sort(sample(nrow(m), 1000)), , drop = FALSE]
+			}
+
+			ht = Heatmap(m, name = "CN", col = colorRamp2(c(0, 2, 4, 6), c("blue", "white", "pink", "red")),
+				cluster_rows = FALSE, cluster_columns = FALSE, 
+				column_split = factor(all_chr[l_chr], levels = intersect(CHROMOSOME, all_chr[l_chr])),
+				column_gap = unit(0, "points"), border = TRUE, column_title_gp = gpar(fontsize = 10),
+				show_row_names = FALSE)
+			draw(ht)
+
 		})
 
-		output[[qq("@{experiment_id}_top_genes_ui")]] = renderUI({
-			div(
-				selectInput(qq("@{experiment_id}_top_genes_n_top"), label = "Number of top genes", choices = c("10" = 10, "20" = 20, "50" = 50, "100" = 100), selected = 20),
-				box(title = "Top genes",
-					tableOutput(qq("@{experiment_id}_top_genes")),
-					width = 3
-				),
-				box(title = qq("OncoPrint of the top genes (in @{length(samples)} samples)"),
-					plotOutput(qq("@{experiment_id}_top_genes_oncoprint")),
-					width = 8
-				),
-				tags$script(HTML(qq('
-	$("#@{experiment_id}_top_genes_n_top").change(function() {
-		var n = parseInt($(this).val());
-		$("#@{experiment_id}_top_genes_oncoprint").height(n*20);
-	});'))),
-				div(style = "clear:both;")
-			)
-		})
-
-		observeEvent(input[[qq("@{experiment_id}_top_genes_n_top")]], {
-		
+		observeEvent(input[[qq("@{experiment_id}_heatmap_chr_submit")]], {
+			showNotification(qq("make cnv heatmap plot for @{experiment_id}."), duration = 4, type = "message")
 			df = df[df$group_name %in% samples, , drop = FALSE]
-			tb = df[, c("group_name", "Gene")]
-			xn = tapply(tb$group_name, tb$Gene, length) # number of SNVs per gene
-			tb = unique(tb)
+			m = CNV_GERMLINE_NORMALIZED$matrix
+			chr_window = CNV_GERMLINE_NORMALIZED$chr_window
 
-			x = tapply(tb$group_name, tb$Gene, length) # number of samples per gene
-			p = x/length(samples)
+			all_chr = as.vector(seqnames(chr_window))
+			l_chr = all_chr %in% input[[qq("@{experiment_id}_heatmap_chr")]]
 
-			k = as.numeric(input[[qq("@{experiment_id}_top_genes_n_top")]])
-			ind = order(p, xn[names(p)], decreasing = TRUE)[1:min(length(p), k)]
+			m = m[samples, l_chr, drop = FALSE]
 
-			output[[qq("@{experiment_id}_top_genes")]] = renderTable({
-				dt = data.frame(Gene = names(p)[ind], Fraction = paste0(round(p[ind]*100, 1), "%"), "#Samples" = x[ind], check.names = FALSE)
-				dt[, 1] = qq("<a href=\"#\" onclick=\"link_to_other_tab($(this), 'gene', {gene_search:'@{dt[,1]}'}, 'gene_search_submit');false\">@{dt[,1]}</a>", collapse = FALSE)
-				dt
-			}, sanitize.text.function = function(x) x)
-
-			tb = tb[tb$Gene %in% names(p)[ind], , drop = FALSE]
-			mm = xtabs(~ Gene + group_name, tb)
-
-			# if(ncol(mm) > 1000) {
-			# 	mm = mm[, sample(ncol(mm), 1000), drop = FALSE]
-			# }
-			output[[qq("@{experiment_id}_top_genes_oncoprint")]] = renderPlot({
-				ht = oncoPrint(list(snv = mm), name = experiment_name,
-					alter_fun = list(snv = alter_graphic("rect", width = 1, height = 0.9, fill = "red")),
-					show_column_names = FALSE)
+			if(nrow(m) > 1000) {
+				m = m[sort(sample(nrow(m), 1000)), , drop = FALSE]
+			}
+			output[[qq("@{experiment_id}_heatmap")]] = renderPlot({
+				ht = Heatmap(m, name = "CN", col = colorRamp2(c(0, 2, 4, 6), c("blue", "white", "pink", "red")),
+					cluster_rows = FALSE, cluster_columns = FALSE, 
+					column_split = factor(all_chr[l_chr], levels = intersect(CHROMOSOME, all_chr[l_chr])),
+					column_gap = unit(0, "points"), border = TRUE, column_title_gp = gpar(fontsize = 10),
+					show_row_names = FALSE)
 				draw(ht)
 			})
 		})
 
-		
-
-		output[[qq("@{experiment_id}_top_samples_ui")]] = renderUI({
+		output[[qq("@{experiment_id}_cnv_plot_ui")]] = renderUI({
 			div(
-				selectInput(qq("@{experiment_id}_top_samples_n_top"), label = "Number of top samples", choices = c("10" = 10, "20" = 20, "50" = 50, "100" = 100), selected = 20),
-				box(title = "Top samples",
-					tableOutput(qq("@{experiment_id}_top_samples")),
-					width = 4
+				div(
+					column(8, textInput(qq("@{experiment_id}_cnv_plot_sample"), "Select a sample", placeholder = samples[1])),
+					column(2, actionButton(qq("@{experiment_id}_cnv_plot_sample_submit"), "Make plot", style="margin-top:24px")),
+					div(style = "clear:both;"),
+					style = "width:500px;margin-left:-15px;"
 				),
-				box(title = qq("OncoPrint (samples are on rows, genes are on columns)"),
-					plotOutput(qq("@{experiment_id}_top_samples_oncoprint")),
-					width = 8
+				div(
+					plotOutput(qq("@{experiment_id}_cnv_plot"), height = 500),
+					style = "margin:10px 0px; padding: 10px; background-color:white;"
 				),
 				tags$script(HTML(qq('
-	$("#@{experiment_id}_top_samples_n_top").change(function() {
-		var n = parseInt($(this).val());
-		$("#@{experiment_id}_top_samples_oncoprint").height(n*20);
-	});'))),
-				div(style = "clear:both;")
+	$("#@{experiment_id}_cnv_plot_sample").typeahead({
+	    source: @{jsonlite::toJSON(samples)},
+	    lookup: function (event) {
+	        var that = this, items;
+	        if (that.ajax) {
+	            that.ajaxer();
+	        } else {
+	            that.query = that.$element.val();
+
+	            if (!that.query) {
+	                return that.shown ? that.hide() : that;
+	            }
+
+	            items = that.grepper(that.source);
+
+	            if (!items) {
+	                return that.shown ? that.hide() : that;
+	            }
+	            return that.render(items.slice(0, that.options.items)).show();
+	        }
+	    }
+	});
+				')))
 			)
 		})
 
-		
-		observeEvent(input[[qq("@{experiment_id}_top_samples_n_top")]], {
-			df = df[df$group_name %in% samples, , drop = FALSE]
-			tb = df[, c("group_name", "Gene")]
-			xn = tapply(tb$group_name, tb$group_name, length) # number of SNVs per sample
-			
-			tb = unique(tb)
-			x = tapply(tb$Gene, tb$group_name, length) # number of genes per sample
-			
-			k = input[[qq("@{experiment_id}_top_samples_n_top")]]
-			ind = order(xn, x, decreasing = TRUE)[1:min(length(xn), k)]
-			
-			output[[qq("@{experiment_id}_top_samples")]] = renderTable({
-				dt = data.frame(Sample = names(x)[ind], "#SNVs" = xn[ind], "#Mutated genes" = x[ind], check.names = FALSE)
-				# dt[, 1] = qq("<a href=\"#\" onclick=\"link_to_other_tab($(this), 'gene', {gene_search:'@{dt[,1]}'}, 'gene_search_submit');false\">@{dt[,1]}</a>", collapse = FALSE)
-				dt
-			}, sanitize.text.function = function(x) x)
+		observeEvent(input[[qq("@{experiment_id}_cnv_plot_sample_submit")]], {
+			sample = input[[qq("@{experiment_id}_cnv_plot_sample")]]
 
-			tb = tb[tb$group_name %in% names(x)[ind], , drop = FALSE]
-			mm = xtabs(~ group_name + Gene, tb)
+			gr = DB[[experiment_id]]@assays[[sample]]
+			gr = gr[width(gr) > 100]
 
-			# if(ncol(mm) > 1000) {
-			# 	mm = mm[, sample(ncol(mm), 1000), drop = FALSE]
-			# }
-			output[[qq("@{experiment_id}_top_samples_oncoprint")]] = renderPlot({
-				ht = oncoPrint(list(snv = mm), name = experiment_name,
-					alter_fun = list(snv = alter_graphic("rect", width = 1, height = 0.9, fill = "red")),
-					show_column_names = FALSE)
-				draw(ht)
+			seqlevelsStyle(gr) = "UCSC"
+
+			output[[qq("@{experiment_id}_cnv_plot")]] = renderPlot({
+				
+				max = max(gr$CN)*1.1
+
+				gtrellis_layout(n_track = 1, nrow = 4, compact = TRUE, species = GENOME, 
+				    track_ylim = c(0, max),
+				    track_ylab = "CN", title = sample,
+				    add_name_track = TRUE, add_ideogram_track = TRUE)
+
+				add_segments_track(gr, gr$CN)
+				add_points_track(gr, gr$CN, track = current_track())
 			})
 		})
-
 
 		output[[qq("@{experiment_id}_table_ui")]] = renderUI({
 			div(
@@ -423,8 +428,6 @@ COMPONENT[[experiment_id]]$server = local({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			df = df[, -1]
 			colnames(df)[1:2] = c("Sample", "Chr")
-			df[, "AF_T"] = round(df[, "AF_T"], 2)
-			df[, "AF_C"] = round(df[, "AF_C"], 2)
 			rownames(df) = NULL
 			df
 		}, server = TRUE, options = list(scrollX = TRUE))
@@ -433,8 +436,6 @@ COMPONENT[[experiment_id]]$server = local({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			df = df[, -1]
 			colnames(df)[1:2] = c("Sample", "Chr")
-			df[, "AF_T"] = round(df[, "AF_T"], 2)
-			df[, "AF_C"] = round(df[, "AF_C"], 2)
 			rownames(df) = NULL
 			df
 

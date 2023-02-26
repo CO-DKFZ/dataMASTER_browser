@@ -1,10 +1,13 @@
-COMPONENT$snv = list()
+COMPONENT$fusion = list()
 
-experiment_id = "snv"
-experiment_name = "SNV"
+experiment_id = "fusion"
+experiment_name = "Fusion"
 
-snv_function_type = c("synonymous", "nonsynonymous", "stopgain", "stoploss", "unknown")
-names(snv_function_type) = snv_function_type
+df = as.data.frame(DB[[experiment_id]])
+
+fusion_function_type = unique(as.vector(df$Function))
+fusion_function_type = fusion_function_type[!is.na(fusion_function_type)]
+names(fusion_function_type) = fusion_function_type
 
 
 nr = elementNROWS(DB[[experiment_id]]@assays)
@@ -15,7 +18,7 @@ COMPONENT[[experiment_id]]$ui = div(
 	div(
 		column(7,
 			selectInput(qq("@{experiment_id}_config_function_type"), label = "Function type", 
-				choices = snv_function_type, selected = c("nonsynonymous", "stopgain", "stoploss"), 
+				choices = fusion_function_type, selected = c("splicing", "UTR3", "UTR5", "UTR", "intergenic", "exon", "intron"), 
 				multiple = TRUE, width = 600),
 			tags$hr(),
 			uiOutput(qq("@{experiment_id}_sample_filter_output")),
@@ -42,11 +45,11 @@ COMPONENT[[experiment_id]]$ui = div(
 			uiOutput(qq("@{experiment_id}_genome_wide_ui")),
 			style = "padding:16px 0px"
 		),
-		tabPanel("Top most mutated genes",
+		tabPanel("Top most fused genes",
 			uiOutput(qq("@{experiment_id}_top_genes_ui")),
 			style = "padding:16px 0px"
 		),
-		tabPanel("Top most mutated samples",
+		tabPanel("Top most fused samples",
 			uiOutput(qq("@{experiment_id}_top_samples_ui")),
 			style = "padding:16px 0px"
 		),
@@ -72,8 +75,8 @@ COMPONENT[[experiment_id]]$server = local({
 	observeEvent(input[[qq("@{experiment_id}_config_function_type")]], {
 
 		if(length(input[[qq("@{experiment_id}_config_function_type")]]) == 0) {
-			updateSelectInput(session, qq("@{experiment_id}_config_function_type"), selected = "nonsynonymous")
-			function_type = "nonsynonymous"
+			updateSelectInput(session, qq("@{experiment_id}_config_function_type"), selected = c("splicing", "UTR3", "UTR5", "UTR", "intergenic", "exon", "intron"))
+			function_type = c("splicing", "UTR3", "UTR5", "UTR", "intergenic", "exon", "intron")
 		} else {
 			function_type = input[[qq("@{experiment_id}_config_function_type")]]
 		}
@@ -203,18 +206,21 @@ COMPONENT[[experiment_id]]$server = local({
 				box(title = qq("Number of @{experiment_name}s per sample"),
 					plotOutput(qq("@{experiment_id}_summary_n_snv"))
 				),
-				box(title = "Number of mutated genes per sample",
+				box(title = "Number of fused genes per sample",
 					plotOutput(qq("@{experiment_id}_summary_n_gene"))
 				),
 				box(title = qq("Number of @{experiment_name}s per chromosome"),
 					plotOutput(qq("@{experiment_id}_summary_n_snv_by_chr")),
 					width = 12
 				),
-				box(title = "Genomic locations",
-					plotOutput(qq("@{experiment_id}_summary_genomic_locations"))
+				box(title = "Genomic Direction",
+					plotOutput(qq("@{experiment_id}_summary_genomic_direction"))
 				),
 				box(title = "Function",
 					plotOutput(qq("@{experiment_id}_summary_function"))
+				),
+				box(title = "Type",
+					plotOutput(qq("@{experiment_id}_summary_type"))
 				),
 				div(style="clear:both;")
 			)
@@ -235,10 +241,10 @@ COMPONENT[[experiment_id]]$server = local({
 		output[[qq("@{experiment_id}_summary_n_gene")]] = renderPlot({
 			showNotification(qq("make overview plot for @{experiment_id}."), duration = 4, type = "message")
 			
-			n = tapply(df$Gene, df$group_name, function(x) length(unique(x)))
+			n = tapply(df$Gene, df$group_name, function(x) length(unique(unlist(strsplit(x, ",")))))
 			n = sort(n)
 			par(mar = c(4, 4, 1, 1))
-			plot(n, pch = 16, cex = 0.5, log = "y", ylab = "# mutated genes (in log10 scale)", xlab = "Ordered samples")
+			plot(n, pch = 16, cex = 0.5, log = "y", ylab = "# fused genes (in log10 scale)", xlab = "Ordered samples")
 			
 			ind = names(n) %in% samples
 			points(which(ind), n[ind], pch = 16, cex = 1, col = "red")
@@ -259,22 +265,28 @@ COMPONENT[[experiment_id]]$server = local({
 			fc = (x/sum(x)) / (chr_len/sum(chr_len))
 			fc = structure(as.vector(fc), names = names(fc))
 			par(mar = c(4, 6, 1, 1))
-            plot(log2(fc), type = "h", ylab = TeX("log2(fold enrichment): log2 ( \\frac{(n_snv/n_all_snv}{(chr_len/genome_len)} )"), axes = FALSE)			
+            plot(log2(fc), type = "h", ylab = TeX("log2(fold enrichment): log2 ( \\frac{(n_fusion/n_all_fusion}{(chr_len/genome_len)} )"), axes = FALSE)			
             axis(side = 1, at = seq_along(fc), labels = names(fc))
 			axis(side = 2)
 			graphics::box()
 		})
 
-		output[[qq("@{experiment_id}_summary_genomic_locations")]] = renderPlot({
+		output[[qq("@{experiment_id}_summary_genomic_direction")]] = renderPlot({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			par(mar = c(4, 4, 1, 1))
-			pie(table(df$Location))
+			pie(table(df$Direction))
 		})
 
 		output[[qq("@{experiment_id}_summary_function")]] = renderPlot({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			par(mar = c(4, 4, 1, 1))
 			pie(table(df$Function))
+		})
+
+		output[[qq("@{experiment_id}_summary_type")]] = renderPlot({
+			df = df[df$group_name %in% samples, , drop = FALSE]
+			par(mar = c(4, 4, 1, 1))
+			pie(table(df$Type))
 		})
 
 		output[[qq("@{experiment_id}_genome_wide_ui")]] = renderUI({
@@ -423,8 +435,6 @@ COMPONENT[[experiment_id]]$server = local({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			df = df[, -1]
 			colnames(df)[1:2] = c("Sample", "Chr")
-			df[, "AF_T"] = round(df[, "AF_T"], 2)
-			df[, "AF_C"] = round(df[, "AF_C"], 2)
 			rownames(df) = NULL
 			df
 		}, server = TRUE, options = list(scrollX = TRUE))
@@ -433,8 +443,6 @@ COMPONENT[[experiment_id]]$server = local({
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			df = df[, -1]
 			colnames(df)[1:2] = c("Sample", "Chr")
-			df[, "AF_T"] = round(df[, "AF_T"], 2)
-			df[, "AF_C"] = round(df[, "AF_C"], 2)
 			rownames(df) = NULL
 			df
 

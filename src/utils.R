@@ -24,7 +24,7 @@ menuItem = function(..., .list = NULL) {
 	do.call(shinydashboard::menuItem, lt)
 }
 
-parse_samples = function(s) {
+parse_samples = function(s, experiment_id = NULL) {
 	s = strsplit(s, "\\s+")[[1]]
 
 	l = META$PatientID %in% s
@@ -32,7 +32,17 @@ parse_samples = function(s) {
 		l = rownames(META) %in% s
 	}
 	samples = rownames(META)[l]
-	samples = intersect(samples, names(DB[["indel"]]@assays))
+	if(!is.null(experiment_id)) {
+		obj = DB[[experiment_id]]
+		if(inherits(obj, "RaggedExperiment")) {
+			samples = intersect(samples, names(obj@assays))
+		} else if(inherits(obj, "RangedSummarizedExperiment")) {
+			samples = intersect(samples, colnames(obj))
+		} else {
+			samples = intersect(samples, colnames(obj))
+		}
+	}
+	samples
 }
 
 parse_gr_str = function(s) {
@@ -60,7 +70,8 @@ make_rainfall = function(gr, layout = "rect") {
 	names(gr) = NULL
 	gr = as.data.frame(gr)
 	if(all(gr[, 3] == gr[, 2])) gr[, 3] = gr[, 3] + 1
-	
+		
+	circos.clear()
 	if(layout == "rect") {
 		gr_density = circlize::genomicDensity(gr, window.size = 2e6, chr.len = read.chromInfo(species = GENOME)$chr.len)
 
@@ -192,5 +203,16 @@ ALTER_FUN = list(
     grid.rect(x, y, w*0.9, h*0.3, gp=gpar(fill=ALTER_COL["LOH"], col=NA))
 )
 
+plotOutput = function(...) {
+	x = shiny::plotOutput(...)
+	x$children[[1]] = p("generating plot or waiting for update...")
+	x
+}
 
+
+tableOutput = function(...) {
+	x = shiny::tableOutput(...)
+	x$children[[1]] = p("generating table or waiting for update...")
+	x
+}
 

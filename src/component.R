@@ -245,10 +245,10 @@ experiment_pane_generator = function(experiment_id, experiment_name) {
 # COMPONENT$snv_germline = experiment_pane_generator("snv_germline", "SNV Germline")
 # COMPONENT$indel = experiment_pane_generator("indel", "Indel")
 # COMPONENT$indel_germline = experiment_pane_generator("indel_germline", "Indel Germline")
-COMPONENT$sv = experiment_pane_generator("sv", "SV")
-COMPONENT$sv_germline = experiment_pane_generator("sv_germline", "SV Germline")
-COMPONENT$cnv = experiment_pane_generator("cnv", "CNV")
-COMPONENT$cnv_germline = experiment_pane_generator("cnv_germline", "CNV Germline")
+# COMPONENT$sv = experiment_pane_generator("sv", "SV")
+# COMPONENT$sv_germline = experiment_pane_generator("sv_germline", "SV Germline")
+# COMPONENT$cnv = experiment_pane_generator("cnv", "CNV")
+# COMPONENT$cnv_germline = experiment_pane_generator("cnv_germline", "CNV Germline")
 COMPONENT$fusion = experiment_pane_generator("fusion", "Gene Fusion")
 
 
