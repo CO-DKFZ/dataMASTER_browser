@@ -115,7 +115,7 @@ COMPONENT$cohort$server = function(input, output, session) {
 						for(i in seq_along(experiments)) {
 							tb = grl[[i]]
 							tb = t(as.matrix(tb))
-							tb[, 1] = paste0("<b>", tb[, 1], "</b>")
+							rownames(tb) = paste0("<b>", rownames(tb), "</b>")
 							tbl[[i]] = box(
 								title = experiments[i],
 								width = 4,
@@ -148,9 +148,10 @@ COMPONENT$cohort$server = function(input, output, session) {
 			rg = rowRanges(DB[["rna"]])
 			m = assays(DB[["rna"]])[[data_type]]
 
+			lg = rg$Gene %in% genes
 			m2 = m[rg$Gene %in% genes, colnames(m) %in% samples, drop = FALSE]
 			m2 = log2(m2+1)
-			Heatmap(m2, name = qq("log2(@{data_type}+1)"))
+			Heatmap(m2, row_labels = rg$Gene[lg], name = qq("log2(@{data_type}+1)"))
 		})
 	})
 
