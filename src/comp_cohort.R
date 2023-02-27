@@ -18,31 +18,11 @@ COMPONENT$cohort$ui = div(
 		id = qq("cohort_tabset"),
 		type = "tabs",
 		tabPanel("Mutations",
-			div(
-				div(
-					column(6,
-						selectInput("cohort_mutations_oncoprint_select", label = "Mutation types", 
-							choices = structure(c("snv", "snv_germline", "indel", "indel_germline", "fusion"), 
-								names = c("snv", "snv_germline", "indel", "indel_germline", "fusion")),
-							selected = c("snv", "snv_germline", "indel", "indel_germline", "fusion"), 
-							multiple = TRUE, width = 500),
-					),
-					column(2,
-						actionButton(qq("cohort_mutations_oncoprint_submit"), "Submit", style="margin-top:24px")
-					),
-					div(style = "clear:both;"),
-					style = "width:900px;margin-left:-15px;"
-				),
-				originalHeatmapOutput(heatmap_id = "cohort_mutations_oncoprint", response = c("click", "brush-output"), width = 600, height = 600),
-	   			HeatmapInfoOutput(heatmap_id = "cohort_mutations_oncoprint", output_ui = htmlOutput("cohort_mutations_oncoprint_output"), width = "90%")
-	   		),
+			uiOutput("cohort_mutations_oncoprint_ui"),
 	   		style = "padding:16px 0px"
 		),
 		tabPanel("Expression",
-			div(
-				selectInput("cohort_expression_type", label = "Type", choices = c("TPM" = "TPM", "FPKM" = "FPKM"), selected = "TPM"),
-				plotOutput("cohort_expression_plot")
-			),
+			uiOutput("cohort_expression_ui"),
 			style = "padding:16px 0px"
 		)
 	)
@@ -117,9 +97,10 @@ COMPONENT$cohort$server = function(input, output, session) {
 							tb = t(as.matrix(tb))
 							rownames(tb) = paste0("<b>", rownames(tb), "</b>")
 							tbl[[i]] = box(
-								title = experiments[i],
+								title = paste0(experiments[i], ": ", sample),
 								width = 4,
-								HTML(knitr::kable(tb, format = "html", escape = FALSE))
+								HTML(knitr::kable(tb, format = "html", escape = FALSE)),
+								style = "overflow-x: scroll; border:#CCC 1px solid; border-radius: 4px"
 							)
 						}
 
@@ -141,6 +122,34 @@ COMPONENT$cohort$server = function(input, output, session) {
 
 		genes = strsplit(input$cohort_genes, "\\s")[[1]]
 		samples = parse_samples(input$cohort_patients)	
+
+		output$cohort_mutations_oncoprint_ui = renderUI({
+			div(
+				div(
+					column(6,
+						selectInput("cohort_mutations_oncoprint_select", label = "Mutation types", 
+							choices = structure(c("snv", "snv_germline", "indel", "indel_germline", "fusion"), 
+								names = c("snv", "snv_germline", "indel", "indel_germline", "fusion")),
+							selected = c("snv", "snv_germline", "indel", "indel_germline", "fusion"), 
+							multiple = TRUE, width = 500),
+					),
+					column(2,
+						actionButton(qq("cohort_mutations_oncoprint_submit"), "Make oncoPrint", style="margin-top:24px")
+					),
+					div(style = "clear:both;"),
+					style = "width:900px;margin-left:-15px;"
+				),
+				originalHeatmapOutput(heatmap_id = "cohort_mutations_oncoprint", response = c("click"), width = 600, height = 600),
+	   			HeatmapInfoOutput(heatmap_id = "cohort_mutations_oncoprint", output_ui = htmlOutput("cohort_mutations_oncoprint_output"), width = "90%")
+	   		)
+		})
+
+		output$cohort_expression_ui = renderUI({
+			div(
+				selectInput("cohort_expression_type", label = "Type", choices = c("TPM" = "TPM", "FPKM" = "FPKM"), selected = "TPM"),
+				plotOutput("cohort_expression_plot")
+			)
+		})
 
 		output[["cohort_expression_plot"]] = renderPlot({
 			data_type = input[["cohort_expression_type"]]
