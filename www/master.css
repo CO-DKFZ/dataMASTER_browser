@@ -5,3 +5,8 @@
 #snv_germline_workspace .tab-content .form-group {
 	margin-left:20px;
 }
+
+.waiting_msg {
+	color: grey;
+	padding:20px 10px;
+}

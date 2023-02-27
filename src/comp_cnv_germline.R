@@ -146,6 +146,9 @@ COMPONENT[[experiment_id]]$server = local({
 
 	observeEvent(input[[qq("@{experiment_id}_sample_filter_field_submit")]], {
 
+		updateTabItems(session, "sidebar_menu", experiment_id)
+		updateTextInput(session, qq("@{experiment_id}_config_sample_list"), value = input[[qq("@{experiment_id}_config_sample_list")]])
+
 		if(length(input[[qq("@{experiment_id}_config_function_type")]]) == 0) {
 			function_type = "nonsynonymous"
 		} else {

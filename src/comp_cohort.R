@@ -3,44 +3,79 @@ COMPONENT$cohort = list()
 
 COMPONENT$cohort$ui = div(
 	h3("OncoPrint"),
-	textAreaInput("cohort_genes", label = "Genes of interest", value = "TP53\nAPC\nRB1\n"),
-	textAreaInput("cohort_patients", label = "Patients of interest", value = "BD26XP\nPP8L7S\n8NFHC7\nRX17A3\nFY5ZQW\nBA95UQ\nFKPP\n"),
-	radioButtons("cohort_experiments_category", label = "Experiments", choices = c("Mutations" = "mutation", "CNVs" = "cnv"), selected = "mutation", inline = TRUE),
-	htmlOutput("cohort_experiments_select"),
-	actionButton("cohort_submit", "Submit"),
-	originalHeatmapOutput("cohort_oncoprint", response = c("click", "brush-output"), width = 400),
-    HeatmapInfoOutput("cohort_oncoprint", output_ui = htmlOutput("cohort_oncoprint_output"), width = "90%")
+	div(
+		column(3,
+			textAreaInput("cohort_genes", label = "Genes of interest", value = "TP53\nAPC\nRB1\n", rows = 6)
+		),
+		column(3,
+			textAreaInput("cohort_patients", label = "Patients of interest", value = "BD26XP\nPP8L7S\n8NFHC7\nRX17A3\nFY5ZQW\nBA95UQ\nFKPP\n", rows = 6),
+			actionButton("cohort_submit", "Submit")
+		),
+		div(style = "clear:both")
+	),
+	br(),
+	tabsetPanel(
+		id = qq("cohort_tabset"),
+		type = "tabs",
+		tabPanel("Mutations",
+			div(
+				div(
+					column(6,
+						selectInput("cohort_mutations_oncoprint_select", label = "Mutation types", 
+							choices = structure(c("snv", "snv_germline", "indel", "indel_germline", "fusion"), 
+								names = c("snv", "snv_germline", "indel", "indel_germline", "fusion")),
+							selected = c("snv", "snv_germline", "indel", "indel_germline", "fusion"), 
+							multiple = TRUE, width = 500),
+					),
+					column(2,
+						actionButton(qq("cohort_mutations_oncoprint_submit"), "Submit", style="margin-top:24px")
+					),
+					div(style = "clear:both;"),
+					style = "width:900px;margin-left:-15px;"
+				),
+				originalHeatmapOutput(heatmap_id = "cohort_mutations_oncoprint", response = c("click", "brush-output"), width = 600, height = 600),
+	   			HeatmapInfoOutput(heatmap_id = "cohort_mutations_oncoprint", output_ui = htmlOutput("cohort_mutations_oncoprint_output"), width = "90%")
+	   		),
+	   		style = "padding:16px 0px"
+		),
+		tabPanel("Expression",
+			div(
+				selectInput("cohort_expression_type", label = "Type", choices = c("TPM" = "TPM", "FPKM" = "FPKM"), selected = "TPM"),
+				plotOutput("cohort_expression_plot")
+			),
+			style = "padding:16px 0px"
+		)
+	)
 )
 
 COMPONENT$cohort$server = function(input, output, session) {
 
-	experiments = c("indel", "indel_germline", "snv", "snv_germline", "fusion", "rna")
-	names(experiments) = experiments
-
-	output$cohort_experiments_select = renderUI({
-		if(input$cohort_experiments_category == "mutation") {
-			selectInput("cohort_experiments", label = "", choices = experiments, selected = setdiff(experiments, "rna"), multiple = TRUE)
-		} else {
-			cnv_all = c("DUP", "AMP", "DEL", "HDEL", "LOH")
-			cnv_all = structure(cnv_all, names = cnv_all)
-			selectInput("cohort_experiments", label = "", choices = cnv_all, selected = cnv_all, multiple = TRUE)
-		}
-	})
-
-	observeEvent(input$cohort_submit, {
-
-		output$cohort_oncoprint_output = renderUI({
-			HTML("")
+	generate_interactive_oncoprint = function(input, output, session, genes, samples, experiments) {
+		ml = vector("list", length(experiments))
+		names(ml) = experiments
+		ml = lapply(ml, function(x) {
+			m = matrix(FALSE, nrow = length(genes), ncol = length(samples))
+			rownames(m) = genes
+			colnames(m) = samples
+			m
 		})
 
-		experiments = input$cohort_experiments
-
-		genes = strsplit(input$cohort_genes, "\\s")[[1]]
-		patients = strsplit(input$cohort_patients, "\\s")[[1]]
-
-		samples = rownames(META)[META$PatientID %in% patients]
-
-		ht = make_oncoprint(genes, samples, experiments)
+		for(e in experiments) {
+			rl = DB[[e]]@assays
+			for(sn in samples) {
+				if(!is.null(rl[[sn]])) {
+					if(e == "fusion") {
+						ind = sapply(genes, function(x) any(grepl(paste0("\\b", x, "\\b"), rl[[sn]]$Gene)))
+					} else {
+						ind = genes %in% rl[[sn]]$Gene
+					}
+					ml[[e]][ind, sn] = TRUE
+				}
+			}
+		}
+	
+		ht = oncoPrint(ml, name = "oncoprint", alter_fun = ALTER_FUN, col=ALTER_COL, 
+			show_column_names = TRUE, remove_empty_columns = TRUE)
 
 		click_action = function(df, output) {
 			if(is.null(df)) {
@@ -62,12 +97,16 @@ COMPONENT$cohort$server = function(input, output, session) {
 				}
 			}
 			if(!is.null(gene)) {
-				output$cohort_oncoprint_output = renderUI({
+				output$cohort_mutations_oncoprint_output = renderUI({
 					if(value != "") {
 						experiments = strsplit(value, ";")[[1]]
 						grl = lapply(experiments, function(e) {
 							gr = DB[[e]]@assays[[sample]]
-							gr[gr$Gene == gene]
+							if(e == "fusion") {
+								gr[grepl(paste0("\\b", gene, "\\b"), gr$Gene)]
+							} else {
+								gr[gr$Gene == gene]
+							}
 						})
 						names(grl) = experiments
 						grl = lapply(grl, as.data.frame)
@@ -76,10 +115,11 @@ COMPONENT$cohort$server = function(input, output, session) {
 						for(i in seq_along(experiments)) {
 							tb = grl[[i]]
 							tb = t(as.matrix(tb))
+							tb[, 1] = paste0("<b>", tb[, 1], "</b>")
 							tbl[[i]] = box(
 								title = experiments[i],
-								width = 6,
-								HTML(knitr::kable(tb, format = "html"))
+								width = 4,
+								HTML(knitr::kable(tb, format = "html", escape = FALSE))
 							)
 						}
 
@@ -91,7 +131,37 @@ COMPONENT$cohort$server = function(input, output, session) {
 			}
 		}
 
-		makeInteractiveComplexHeatmap(input, output, session, ht, "cohort_oncoprint",
+		makeInteractiveComplexHeatmap(input, output, session, ht, 
+			heatmap_id = "cohort_mutations_oncoprint",
 			click_action = click_action)
+	}
+
+
+	observeEvent(input$cohort_submit, {
+
+		genes = strsplit(input$cohort_genes, "\\s")[[1]]
+		samples = parse_samples(input$cohort_patients)	
+
+		output[["cohort_expression_plot"]] = renderPlot({
+			data_type = input[["cohort_expression_type"]]
+
+			rg = rowRanges(DB[["rna"]])
+			m = assays(DB[["rna"]])[[data_type]]
+
+			m2 = m[rg$Gene %in% genes, colnames(m) %in% samples, drop = FALSE]
+			m2 = log2(m2+1)
+			Heatmap(m2, name = qq("log2(@{data_type}+1)"))
+		})
+	})
+
+	observeEvent(input$cohort_mutations_oncoprint_submit,  {
+		genes = strsplit(input$cohort_genes, "\\s")[[1]]
+		samples = parse_samples(input$cohort_patients)
+
+		# oncoprint for mutations
+		experiments = input$cohort_mutations_oncoprint_select
+		
+		generate_interactive_oncoprint(input, output, session, genes, samples, experiments)
+
 	})
 }

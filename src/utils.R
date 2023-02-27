@@ -205,14 +205,14 @@ ALTER_FUN = list(
 
 plotOutput = function(...) {
 	x = shiny::plotOutput(...)
-	x$children[[1]] = p("generating plot or waiting for update...")
+	x$children[[1]] = p("generating plot or waiting for update...", class="waiting_msg")
 	x
 }
 
 
 tableOutput = function(...) {
 	x = shiny::tableOutput(...)
-	x$children[[1]] = p("generating table or waiting for update...")
+	x$children[[1]] = p("generating table or waiting for update...", class="waiting_msg")
 	x
 }
 

@@ -343,7 +343,7 @@ COMPONENT[[experiment_id]]$server = local({
 
 			output[[qq("@{experiment_id}_top_genes")]] = renderTable({
 				dt = data.frame(Gene = names(p)[ind], Fraction = paste0(round(p[ind]*100, 1), "%"), "#Samples" = x[ind], check.names = FALSE)
-				dt[, 1] = qq("<a href=\"#\" onclick=\"link_to_other_tab($(this), 'gene', {gene_search:'@{dt[,1]}'}, 'gene_search_submit');false\">@{dt[,1]}</a>", collapse = FALSE)
+				dt[, 1] = qq("<a href=\"#\" onclick=\"link_to_other_tab($(this), 'region', {region_search:'@{dt[,1]}'}, 'region_search_submit');false\">@{dt[,1]}</a>", collapse = FALSE)
 				dt
 			}, sanitize.text.function = function(x) x)
 

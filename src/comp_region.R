@@ -22,7 +22,7 @@ COMPONENT$region$ui = div(
 		tabPanel(qq("Table"),
 			uiOutput(qq("region_table_ui")),
 			style = "padding:16px 0px"
-		),
+		)
 	)
 )
 

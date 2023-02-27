@@ -81,7 +81,7 @@ ui = dashboardPage(
 		sidebarMenu(
 			id = "sidebar_menu",
 			menuItem("Overview", tabName = "overview"),
-			menuItem("Experiments",
+			menuItem("Experiments", startExpanded = TRUE,
 				.list = lapply(EXPERIMENT_NAME, function(e) {
 					menuSubItem(e, tabName = e)
 				})
