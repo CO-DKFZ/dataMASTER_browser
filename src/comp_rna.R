@@ -145,6 +145,13 @@ COMPONENT[[experiment_id]]$server = local({
 		data_type = input[[qq("@{experiment_id}_config_expr_type")]]
 		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]], experiment_id)
 
+		if(length(samples) == 0) {
+			output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
+				p("No sample is found.")
+			})
+			return(NULL)
+		}
+		
 		output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
 			div(
 				box(title = qq("Global distribution"),

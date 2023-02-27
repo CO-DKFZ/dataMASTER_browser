@@ -123,6 +123,19 @@ COMPONENT$cohort$server = function(input, output, session) {
 		genes = strsplit(input$cohort_genes, "\\s")[[1]]
 		samples = parse_samples(input$cohort_patients)	
 
+		if(length(genes) == 0) {
+			output$cohort_mutations_oncoprint_ui = renderUI({
+				p("No gene is found.")
+			})
+			return(NULL)
+		}
+		if(length(samples) == 0) {
+			output$cohort_mutations_oncoprint_ui = renderUI({
+				p("No sample is found.")
+			})
+			return(NULL)
+		}
+
 		output$cohort_mutations_oncoprint_ui = renderUI({
 			div(
 				div(
@@ -170,8 +183,9 @@ COMPONENT$cohort$server = function(input, output, session) {
 
 		# oncoprint for mutations
 		experiments = input$cohort_mutations_oncoprint_select
-		
-		generate_interactive_oncoprint(input, output, session, genes, samples, experiments)
+		if(length(experiments)) {
+			generate_interactive_oncoprint(input, output, session, genes, samples, experiments)
+		}
 
 	})
 }

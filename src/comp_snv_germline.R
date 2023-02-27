@@ -206,6 +206,13 @@ COMPONENT[[experiment_id]]$server = local({
 		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]], experiment_id)
 		df = df[df$Function %in% function_type, , drop = FALSE]
 
+		if(length(samples) == 0) {
+			output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
+				p("No sample is found.")
+			})
+			return(NULL)
+		}
+		
 		output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
 			div(
 				box(title = qq("Number of @{experiment_name}s per sample"),
@@ -346,9 +353,9 @@ COMPONENT[[experiment_id]]$server = local({
 			tb = tb[tb$Gene %in% names(p)[ind], , drop = FALSE]
 			mm = xtabs(~ Gene + group_name, tb)
 
-			# if(ncol(mm) > 1000) {
-			# 	mm = mm[, sample(ncol(mm), 1000), drop = FALSE]
-			# }
+			if(ncol(mm) > 2000) {
+				mm = mm[, sample(ncol(mm), 2000), drop = FALSE]
+			}
 			output[[qq("@{experiment_id}_top_genes_oncoprint")]] = renderPlot({
 				ht = oncoPrint(list(snv_germline = mm), name = experiment_name,
 					alter_fun = list(snv_germline = alter_graphic("rect", width = 1, height = 0.9, fill = "red")),
@@ -400,9 +407,9 @@ COMPONENT[[experiment_id]]$server = local({
 			tb = tb[tb$group_name %in% names(x)[ind], , drop = FALSE]
 			mm = xtabs(~ group_name + Gene, tb)
 
-			# if(ncol(mm) > 1000) {
-			# 	mm = mm[, sample(ncol(mm), 1000), drop = FALSE]
-			# }
+			if(ncol(mm) > 2000) {
+				mm = mm[, sample(ncol(mm), 2000), drop = FALSE]
+			}
 			output[[qq("@{experiment_id}_top_samples_oncoprint")]] = renderPlot({
 				ht = oncoPrint(list(snv_germline = mm), name = experiment_name,
 					alter_fun = list(snv_germline = alter_graphic("rect", width = 1, height = 0.9, fill = "red")),

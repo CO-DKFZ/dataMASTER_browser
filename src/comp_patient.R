@@ -35,11 +35,11 @@ COMPONENT$patient$ui = div(
 	tabsetPanel(
 		type = "tabs",
 		tabPanel(qq("Meta table"),
-			tableOutput("patient_search_table"),
+			uiOutput("patient_search_table_ui"),
 			style = "padding:16px 0px"
 		),
 		tabPanel(qq("analysis"),
-			tableOutput("patient_analysis"),
+			uiOutput("patient_analysis_ui"),
 			style = "padding:16px 0px"
 		)
 	)
@@ -55,6 +55,21 @@ COMPONENT$patient$server = function(input, output, session) {
 		}
 
 		ind = which(l)
+
+		if(length(ind) == 0) {
+			output$patient_search_table_ui = renderUI({
+				p("No sample is found.")
+			})
+			return(NULL)
+		}
+
+		output$patient_search_table_ui = renderUI({
+			tableOutput("patient_search_table")
+		})
+
+		output$patient_analysis_ui = renderUI({
+			tableOutput("patient_analysis")
+		})
 
 		output$patient_search_table = renderTable({
 

@@ -203,6 +203,13 @@ COMPONENT[[experiment_id]]$server = local({
 		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]], experiment_id)
 		df = df[df$Type %in% function_type, , drop = FALSE]
 
+		if(length(samples) == 0) {
+			output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
+				p("No sample is found.")
+			})
+			return(NULL)
+		}
+
 		output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
 			div(
 				box(title = qq("Number of @{experiment_name}s per sample"),
@@ -321,7 +328,7 @@ COMPONENT[[experiment_id]]$server = local({
 			all_chr = as.vector(seqnames(chr_window))
 			l_chr = all_chr %in% CHROMOSOME
 
-			m = m[samples, l_chr, drop = FALSE]
+			m = m[rownames(m) %in% samples, l_chr, drop = FALSE]
 
 			if(nrow(m) > 1000) {
 				m = m[sort(sample(nrow(m), 1000)), , drop = FALSE]
@@ -337,14 +344,14 @@ COMPONENT[[experiment_id]]$server = local({
 
 		observeEvent(input[[qq("@{experiment_id}_heatmap_chr_submit")]], {
 			showNotification(qq("make cnv heatmap plot for @{experiment_id}."), duration = 4, type = "message")
-			df = df[df$group_name %in% samples, , drop = FALSE]
+
 			m = CNV_NORMALIZED$matrix
 			chr_window = CNV_NORMALIZED$chr_window
 
 			all_chr = as.vector(seqnames(chr_window))
 			l_chr = all_chr %in% input[[qq("@{experiment_id}_heatmap_chr")]]
 
-			m = m[samples, l_chr, drop = FALSE]
+			m = m[rownames(m) %in% samples, l_chr, drop = FALSE]
 
 			if(nrow(m) > 1000) {
 				m = m[sort(sample(nrow(m), 1000)), , drop = FALSE]
@@ -401,6 +408,14 @@ COMPONENT[[experiment_id]]$server = local({
 			sample = input[[qq("@{experiment_id}_cnv_plot_sample")]]
 
 			gr = DB[[experiment_id]]@assays[[sample]]
+			if(is.null(gr)) {
+				output[[qq("@{experiment_id}_cnv_plot")]] = renderPlot({
+					plot(NULL, xlim = c(0, 1), ylim = c(0, 1), type = "n", axes = FALSE, ann = FASE)
+					text(0.5, 0.5, "No sample is found.", cex = 3)
+				})
+				return(NULL)
+			}
+
 			gr = gr[width(gr) > 500000]
 
 			seqlevelsStyle(gr) = "UCSC"

@@ -12,7 +12,7 @@ COMPONENT$region$ui = div(
 	tabsetPanel(
 		type = "tabs",
 		tabPanel(qq("IGV browser"),
-			uiOutput(qq("regoin_igv_ui")),
+			uiOutput(qq("region_igv_ui")),
 			style = "padding:16px 0px"
 		),
 		tabPanel(qq("Genes"),
@@ -28,26 +28,48 @@ COMPONENT$region$ui = div(
 
 COMPONENT$region$server = function(input, output, session) {
 	observeEvent(input$region_search_submit, {
-
-		showNotification("Loading IGV JavaScript browser", duration = 4, type = "message")
-
+		
 		updateTabItems(session, "sidebar_menu", "region")
 
 		region_search = input$region_search
-		
+		updateTextInput(session, "region_search", value = region_search)
+
 		if(!grepl("^(chr)?[0-9XYxy]+:", region_search)) {
 			gr_g = as.data.frame(GENCODE[GENCODE$gene_name == region_search])
 			region_search = paste0("chr", gr_g[, 1], ":", gr_g[, 2], "-", gr_g[, 3])
+			if(nrow(gr_g) == 0) {
+				region_search = ""
+			}
 		}
-		updateTextInput(session, "region_search", value = region_search)
-
+		
 		gr_search = parse_gr_str(region_search)
+
+		if(length(gr_search) == 0 || nrow(gr_g) == 0) {
+			output[["region_igv_ui"]] = renderUI({
+				p("Region string should be a gene symbol or in a format of '1:1000-2000'.")
+			})
+			return(NULL)
+		}
+
+		samples = NULL
+		if(!grepl("^\\s*$", input$region_sample_list)) {
+			samples = parse_samples(input$region_sample_list)
+			if(length(samples) == 0) {
+				output[["region_igv_ui"]] = renderUI({
+					p("No sample is found.")
+				})
+				return(NULL)
+			}
+		}
+
+		showNotification("Loading IGV JavaScript browser", duration = 4, type = "message")
+
 		gr_search = GRanges(seqnames = gr_search[[1]], ranges = IRanges(gr_search[[2]], gr_search[[3]]))
 
 		experiments = c("snv", "snv_germline", "indel", "indel_germline", "sv", "sv_germline", "fusion")
 		names(experiments) = experiments
 		
-		output[[qq("regoin_igv_ui")]] = renderUI({
+		output[[qq("region_igv_ui")]] = renderUI({
 				
 			div(
 				div(
@@ -96,11 +118,6 @@ COMPONENT$region$server = function(input, output, session) {
 			tb
 		}, sanitize.text.function = function(x) x)
 
-
-		samples = NULL
-		if(!grepl("^\\s*$", input$region_sample_list)) {
-			samples = parse_samples(input$region_sample_list)
-		}
 
 		glhits = lapply(experiments, function(e) {
 			grl = DB[[e]]@assays

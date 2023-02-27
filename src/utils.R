@@ -124,52 +124,6 @@ make_rainfall = function(gr, layout = "rect") {
 }
 
 
-make_oncoprint = function(genes, samples, experiments) {
-
-	if("rna" %in% experiments) {
-		use_rna = TRUE
-	} else {
-		use_rna = FALSE
-	}
-
-	experiments = setdiff(experiments, "rna")
-
-	ml = vector("list", length(experiments))
-	names(ml) = experiments
-	ml = lapply(ml, function(x) {
-		m = matrix(FALSE, nrow = length(genes), ncol = length(samples))
-		rownames(m) = genes
-		colnames(m) = samples
-		m
-	})
-
-	for(e in experiments) {
-		rl = DB[[e]]@assays
-		for(sn in samples) {
-			if(!is.null(rl[[sn]])) {
-				ind = genes %in% rl[[sn]]$Gene
-				ml[[e]][ind, sn] = TRUE
-			}
-		}
-	}
-
-	ht = oncoPrint(ml, name = "oncoprint", alter_fun = ALTER_FUN, col=ALTER_COL, show_column_names=FALSE, remove_empty_columns = TRUE)
-
-	if(use_rna) {
-		expr = assay(DB[["rna"]], "TPM")
-
-		gn = structure(names = GENCODE$gene_id, GENCODE$gene_name)
-
-		rownames(expr) = gn[rownames(expr)]
-
-		expr = expr[genes, intersect(samples, colnames(expr))]
-
-		ht = ht + Heatmap(expr, name = "TPM", show_column_names = FALSE)
-	}
-
-	ht
-}
-
 
 ALTER_COL = c(indel="goldenrod1", indel_germline="goldenrod4",
 	        snv="darkorchid1", snv_germline="darkorchid4",

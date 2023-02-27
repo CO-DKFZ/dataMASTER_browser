@@ -204,6 +204,13 @@ COMPONENT[[experiment_id]]$server = local({
 		df = df[df$Type %in% function_type, , drop = FALSE]
 		df$TargetChrom = gsub("[^0-9]", "", df$TargetChrom)
 
+		if(length(samples) == 0) {
+			output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
+				p("No sample is found.")
+			})
+			return(NULL)
+		}
+		
 		output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
 			div(
 				box(title = qq("Number of @{experiment_name}s per sample"),

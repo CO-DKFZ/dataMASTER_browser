@@ -44,6 +44,9 @@ load("dataMASTER.RData")
 load("gencode19_gns_lite.RData")
 GENCODE = gencode19_gns_lite
 
+source("src/config.R")
+source("src/utils.R")
+
 
 DB = dataMASTER
 META = colData(DB)
@@ -65,10 +68,6 @@ CNV_GERMLINE_NORMALIZED = readRDS("normalized_CNV_germline.rds")
 
 COMPONENT = list()
 
-foo = function() {
-
-source("src/config.R")
-source("src/utils.R")
 
 for(f in list.files(path = "src", pattern = "comp_", full.name = TRUE)) {
 	source(f)
@@ -116,6 +115,6 @@ server = function(input, output, session) {
 }
 
 print(shinyApp(ui, server))
-}
+
 
 
