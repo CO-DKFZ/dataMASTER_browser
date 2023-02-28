@@ -128,7 +128,7 @@ make_rainfall = function(gr, layout = "rect") {
 ALTER_COL = c(indel="goldenrod1", indel_germline="goldenrod4",
 	        snv="darkorchid1", snv_germline="darkorchid4",
 	        fusion="limegreen", DUP="salmon", AMP="red", DEL="deepskyblue", 
-	        HDEL="blue", LOH="grey40")
+	        HDEL="blue", CNN="grey40")
 
 ALTER_FUN = list(
   background = function(x, y, w, h)
@@ -146,15 +146,15 @@ ALTER_FUN = list(
     grid.rect(x, y, w*0.9, h*0.45, gp=gpar(fill=ALTER_COL["fusion"], col=NA)),
 
   DUP = function(x, y, w, h)
-    grid.rect(x, y, w*0.9, h*0.9, gp=gpar(fill=ALTER_COL["dup"], col=NA)),
+    grid.rect(x, y, w*0.9, h*0.9, gp=gpar(fill=ALTER_COL["DUP"], col=NA)),
   AMP = function(x, y, w, h)
-    grid.rect(x, y, w*0.9, h*0.8, gp=gpar(fill=ALTER_COL["amp"], col=NA)),
+    grid.rect(x, y, w*0.9, h*0.8, gp=gpar(fill=ALTER_COL["AMP"], col=NA)),
   DEL = function(x, y, w, h)
-    grid.rect(x, y, w*0.9, h*0.7, gp=gpar(fill=ALTER_COL["del"], col=NA)),
+    grid.rect(x, y, w*0.9, h*0.7, gp=gpar(fill=ALTER_COL["DEL"], col=NA)),
   HDEL = function(x, y, w, h)
-    grid.rect(x, y, w*0.9, h*0.6, gp=gpar(fill=ALTER_COL["hdel"], col=NA)),
-  LOH = function(x, y, w, h)
-    grid.rect(x, y, w*0.9, h*0.3, gp=gpar(fill=ALTER_COL["LOH"], col=NA))
+    grid.rect(x, y, w*0.9, h*0.6, gp=gpar(fill=ALTER_COL["HDEL"], col=NA)),
+  CNN = function(x, y, w, h)
+    grid.rect(x, y, w*0.9, h*0.3, gp=gpar(fill=ALTER_COL["CNN"], col=NA))
 )
 
 plotOutput = function(...) {

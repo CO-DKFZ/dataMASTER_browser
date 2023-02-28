@@ -68,7 +68,7 @@ CNV_GERMLINE_NORMALIZED = readRDS("normalized_CNV_germline.rds")
 
 COMPONENT = list()
 
-
+foo = function() {
 for(f in list.files(path = "src", pattern = "comp_", full.name = TRUE)) {
 	source(f)
 }
@@ -115,6 +115,6 @@ server = function(input, output, session) {
 }
 
 print(shinyApp(ui, server))
-
+}
 
 
