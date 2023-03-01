@@ -311,7 +311,7 @@ COMPONENT[[experiment_id]]$server = local({
 		})
 
 		output[[qq("@{experiment_id}_rainfall")]] = renderPlot({
-			showNotification(qq("make rainfall plot for @{experiment_id}."), duration = 4, type = "message")
+			showNotification(qq("make genome-wide plot for @{experiment_id}."), duration = 4, type = "message")
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			make_rainfall(GRanges(seqnames = df$seqnames, ranges = IRanges(df$start, df$end)), layout = input[[qq("@{experiment_id}_genome_wide_radio")]])
 		})
@@ -329,6 +329,8 @@ COMPONENT[[experiment_id]]$server = local({
 		})
 
 		observeEvent(input[[qq("@{experiment_id}_top_samples_n_top")]], {
+			showNotification(qq("generate table and plot for top samples."), duration = 4, type = "message")
+
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			tb = df[, c("group_name"), drop = FALSE]
 			xn = tapply(tb$group_name, tb$group_name, length) # number of SNVs per sample

@@ -140,7 +140,8 @@ COMPONENT$region$server = function(input, output, session) {
 				div(
 					DTOutput("region_table_output"),
 					style = "margin:10px 15px; padding: 10px; background-color:white;"
-				)
+				),
+				tags$script(HTML(qq("document.getElementById('region_table_@{experiments[ll][1]}').click(); Shiny.setInputValue('region_table_@{experiments[ll][1]}', @{sample(100000, 1)});")))
 			)
 		})
 
@@ -162,7 +163,11 @@ COMPONENT$region$server = function(input, output, session) {
 
 
 		observeEvent(input$region_add_track_submit, {
+
 			e = input$region_igv_track
+
+			showNotification(qq("adding a @{e} track"), duration = 4, type = "message")
+			
 
 			if(e == "gencode v19") {
 				loadGFF3TrackFromLocalData(session, id = "Gencode v19", trackName = e, tbl.gff3 = GENCODE_GFF)

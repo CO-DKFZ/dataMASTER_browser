@@ -102,7 +102,11 @@ ui = dashboardPage(
 					COMPONENT[[e]]$ui
 				)
 			})
-		)
+		),
+		style = "min-width:",
+		tags$script(HTML('
+$("#sidebarItemExpanded").append("<hr><p style=\'color:black;padding:4px 15px;\'>Developed by <a style=\'color:#3c8dbc;\' href=\'https://github.com/jokergoo/\' target=\'_blank\'>Zuguang Gu</a>. Source code is available at <a style=\'color:#3c8dbc;\' href=\'https://github.com/CO-DKFZ/dataMASTER_browser\' target=\'_blank\'>GitHub</a>.</p>");
+	'))
 	),
 	tags$head(tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/bootstrap-3-typeahead/4.0.2/bootstrap3-typeahead.min.js"))
 )
@@ -117,4 +121,4 @@ server = function(input, output, session) {
 print(shinyApp(ui, server))
 }
 
-
+foo()

@@ -104,6 +104,8 @@ COMPONENT$cohort$server = function(input, output, session) {
 		output[["cohort_expression_plot"]] = renderPlot({
 			data_type = input[["cohort_expression_type"]]
 
+			showNotification(qq("make heatmap."), duration = 4, type = "message")
+
 			rg = rowRanges(DB[["rna"]])
 			m = assays(DB[["rna"]])[[data_type]]
 

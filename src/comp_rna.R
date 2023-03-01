@@ -163,6 +163,9 @@ COMPONENT[[experiment_id]]$server = local({
 		})
 
 		output[[qq("@{experiment_id}_summary_global_distribution")]] = renderPlot({
+
+			showNotification(qq("Global distributino of all samples. This may take long."), duration = 8, type = "message")
+
 			mat = assay(DB[["rna"]], data_type)
 			mat = mat[l_pc, samples, drop = FALSE]
 			if(nrow(mat) > 2000) {
@@ -189,6 +192,9 @@ COMPONENT[[experiment_id]]$server = local({
 		})
 
 		output[[qq("@{experiment_id}_selected_genes")]] = renderPlot({
+
+			showNotification(qq("Heatmap of selected genes. This may take long."), duration = 8, type = "message")
+
 			mat = assay(DB[["rna"]], data_type)
 			mat = mat[l_pc, samples, drop = FALSE]
 			mat = log2(mat + 1)
@@ -234,6 +240,9 @@ COMPONENT[[experiment_id]]$server = local({
 		})
 
 		output[[qq("@{experiment_id}_dimention_reduction")]] = renderPlot({
+
+			showNotification(qq("Dimensioin reduction. This may take long."), duration = 10, type = "message")
+
 			mat = assay(DB[["rna"]], data_type)
 			mat = mat[l_pc, samples, drop = FALSE]
 			mat = log2(mat + 1)

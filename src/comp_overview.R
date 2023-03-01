@@ -53,6 +53,9 @@ COMPONENT$overview$server = local({
 			local({
 				x = x
 				output[[qq("overview_@{x}_plot")]] = renderPlot({
+					if(x == CD_SELECTED[1]) {
+						showNotification(qq("make overview plot for meta columns."), duration = 4, type = "message")
+					}
 					par(mar = c(4, 4, 1, 1))
 					plot(sort(CD[[x]]), pch = 16, cex = 0.5, xlab = "Samples", ylab = x)
 				})
@@ -61,6 +64,9 @@ COMPONENT$overview$server = local({
 			local({
 				x = x
 				output[[qq("overview_@{x}_table")]] = renderDT({
+					if(x == CD_SELECTED[1]) {
+						showNotification(qq("make overview table for meta columns."), duration = 4, type = "message")
+					}
 					tb = table(CD[[x]])
 					tb = sort(tb, decreasing = TRUE)
 					datatable(as.data.frame(tb), options = list(dom = 'tipr'), rownames = FALSE)

@@ -320,7 +320,7 @@ COMPONENT[[experiment_id]]$server = local({
 		})
 
 		output[[qq("@{experiment_id}_heatmap")]] = renderPlot({
-			showNotification(qq("make cnv heatmap plot for @{experiment_id}."), duration = 4, type = "message")
+			showNotification(qq("make cnv heatmap plot for @{experiment_id}. This may take long."), duration = 4, type = "message")
 			df = df[df$group_name %in% samples, , drop = FALSE]
 			m = CNV_NORMALIZED$matrix
 			chr_window = CNV_NORMALIZED$chr_window
@@ -405,6 +405,9 @@ COMPONENT[[experiment_id]]$server = local({
 		})
 
 		observeEvent(input[[qq("@{experiment_id}_cnv_plot_sample_submit")]], {
+
+			showNotification(qq("make cnv plot for @{experiment_id}."), duration = 4, type = "message")
+
 			sample = input[[qq("@{experiment_id}_cnv_plot_sample")]]
 
 			gr = DB[[experiment_id]]@assays[[sample]]
