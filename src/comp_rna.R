@@ -141,9 +141,14 @@ COMPONENT[[experiment_id]]$server = local({
 		})
 	})
 
+	cache = new.env()
+	cache$dimension_reduction_pos = list()
+
 	observeEvent(input[[qq("@{experiment_id}_config_submit")]], {
 		data_type = input[[qq("@{experiment_id}_config_expr_type")]]
 		samples = parse_samples(input[[qq("@{experiment_id}_config_sample_list")]], experiment_id)
+
+		cache$dimension_reduction_pos = list()
 
 		if(length(samples) == 0) {
 			output[[qq("@{experiment_id}_summary_ui")]] = renderUI({
@@ -227,21 +232,37 @@ COMPONENT[[experiment_id]]$server = local({
 				column(3,
 					selectInput(qq("@{experiment_id}_dimension_reduction_method"), label = "Method", 
 						choices = c("UMAP" = "UMAP", "t-SNE" = "t-SNE", "PCA" = "PCA"),
-						selected = "UMAP", width = 300)
+						selected = "UMAP", width = 300),
+					actionButton(qq("@{experiment_id}_dimension_reduction_rerun"), label = "Force rerun")
 				),
 				column(3,
-					selectInput(qq("@{experiment_id}_dimension_reduction_color_by"), label = "Color by",
+					selectInput(qq("@{experiment_id}_dimension_reduction_color_by"), label = "Color by meta column",
 						choices = structure(c("none", CD_SELECTED), names = c("none", CD_SELECTED)),
-						selected = "none", width = 300)
+						selected = "none", width = 300),
+
+
+					HTML(qq('<div class="form-group" style="width:300px;">
+  <label class="control-label" id="@{experiment_id}_dimension_reduction_color_by_expr-label" for="@{experiment_id}_dimension_reduction_color_by_expr">Or color by gene expression</label>
+  <input id="@{experiment_id}_dimension_reduction_color_by_expr" type="text" class="form-control" value=""/>
+</div>')),
+					tags$script(HTML(qq('
+	$("#@{experiment_id}_dimension_reduction_color_by").change(function() {
+		$("#@{experiment_id}_dimension_reduction_color_by_expr").val("");
+		Shiny.setInputValue("@{experiment_id}_dimension_reduction_color_by_expr_g", "");
+	});
+	$("#@{experiment_id}_dimension_reduction_color_by_expr").focusout(function() {
+		Shiny.setInputValue("@{experiment_id}_dimension_reduction_color_by_expr_g", $("#@{experiment_id}_dimension_reduction_color_by_expr").val());
+	});
+				')))
 				),
 				div(style="clear:both;"),
 				plotOutput(qq("@{experiment_id}_dimention_reduction"), height = 800, width = 800)
 			)
 		})
 
-		output[[qq("@{experiment_id}_dimention_reduction")]] = renderPlot({
+		cache$dimension_reduction_submit = -1
 
-			showNotification(qq("Dimensioin reduction. This may take long."), duration = 10, type = "message")
+		observe({
 
 			mat = assay(DB[["rna"]], data_type)
 			mat = mat[l_pc, samples, drop = FALSE]
@@ -249,22 +270,68 @@ COMPONENT[[experiment_id]]$server = local({
 			ind = order(-rowSds(mat))[1:1000]
 			m2 = mat[ind, , drop = FALSE]
 
-			color_by = input[[qq("@{experiment_id}_dimension_reduction_color_by")]]
-			if(color_by == "none") {
-				dimension_reduction(m2, method = input[[qq("@{experiment_id}_dimension_reduction_method")]],
-					scale = TRUE)
-			} else {
-				v = CD[samples, color_by]
-				col = ComplexHeatmap:::default_col(v)
-				if(is.function(col)) {
-					col2 = col(v)
-				} else {
-					col2 = col[v]
+			method = input[[qq("@{experiment_id}_dimension_reduction_method")]]
+			color_by = input[[qq("@{experiment_id}_dimension_reduction_color_by")]]; if(is.null(color_by)) color_by = "none"
+			gene = input[[qq("@{experiment_id}_dimension_reduction_color_by_expr_g")]]
+
+			if(!(identical(gene, NULL) || identical(gene, ""))) {
+				if(!gene %in% GENCODE$gene_name) {
+					showNotification(qq("Cannot find gene '@{gene}'."), duration = 10, type = "error")
+					return(NULL)
 				}
-				col2[is.na(col2)] = "#EEEEEE"
-				dimension_reduction(m2, method = input[[qq("@{experiment_id}_dimension_reduction_method")]],
-					scale = TRUE, col = col2)
 			}
+
+			col_v = NULL
+			if(!(identical(gene, NULL) || identical(gene, ""))) {
+				col_v = log2(mat[GENCODE$gene_id[GENCODE$gene_name == gene], ] + 1)
+				col_v = as.vector(scale(col_v))
+				color_by = "by_expr"
+			} else {
+				if(color_by != "none") {
+					col_v = CD[samples, color_by]
+				}
+			}
+
+			output[[qq("@{experiment_id}_dimention_reduction")]] = renderPlot({
+				if(cache$dimension_reduction_submit != input[[qq("@{experiment_id}_dimension_reduction_rerun")]] || is.null(cache$dimension_reduction_pos[[method]])) {
+					
+					showNotification(qq("Dimensioin reduction. This may take long."), duration = ifelse(ncol(m2) > 500, 10, 5), type = "message")
+
+					cache$dimension_reduction_submit = input[[qq("@{experiment_id}_dimension_reduction_rerun")]]
+					if(color_by == "none") {
+						pos = dimension_reduction(m2, method = method,
+							scale = TRUE)
+						cache$dimension_reduction_pos[[method]] = pos
+					} else {
+						col = ComplexHeatmap:::default_col(col_v, TRUE)
+						if(is.function(col)) {
+							col2 = col(col_v)
+						} else {
+							col2 = col[col_v]
+						}
+						col2[is.na(col2)] = "#EEEEEE"
+						pos = dimension_reduction(m2, method = method,
+							scale = TRUE, col = col2)
+						cache$dimension_reduction_pos[[method]] = pos
+					}
+				} else {
+					pos = cache$dimension_reduction_pos[[method]]
+					if(color_by == "none") {
+						plot(pos[, 1], pos[, 2], pch = 16, cex = 1, xlab = paste0(method, " 1"), ylab = paste0(method, " 2"), 
+							main = qq("@{method} on a matrix with 1000 rows, rows are scaled, with 10 PCs"))
+					} else {
+						col = ComplexHeatmap:::default_col(col_v, TRUE)
+						if(is.function(col)) {
+							col2 = col(col_v)
+						} else {
+							col2 = col[col_v]
+						}
+						col2[is.na(col2)] = "#EEEEEE"
+						plot(pos[, 1], pos[, 2], pch = 16, cex = 1, xlab = paste0(method, " 1"), ylab = paste0(method, " 2"), 
+							main = qq("@{method} on a matrix with 1000 rows, rows are scaled, with 10 PCs"), col = col2)
+					}
+				}
+			})
 		})
 
 	})

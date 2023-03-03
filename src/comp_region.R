@@ -40,6 +40,8 @@ COMPONENT$region$server = function(input, output, session) {
 			if(nrow(gr_g) == 0) {
 				region_search = ""
 			}
+		} else {
+			gr_g = data.frame(foo = numeric(1))
 		}
 		
 		gr_search = parse_gr_str(region_search)
